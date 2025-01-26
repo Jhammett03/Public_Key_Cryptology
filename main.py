@@ -2,6 +2,7 @@ from Crypto.Cipher import AES
 from Crypto.Hash import SHA256
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
+from Crypto.Util.number import getPrime, inverse, bytes_to_long, long_to_bytes
 import random
 
 def diffie_hellman_large_params(q, alpha):
@@ -49,6 +50,48 @@ def aes_decrypt(key, ciphertext):
     plaintext = unpad(cipher.decrypt(ciphertext[16:]), AES.block_size)
     return plaintext.decode()
 
+def extended_gcd(a, b):
+    if b == 0:
+        return a, 1, 0
+    gcd, x1, y1 = extended_gcd(b, a % b)
+    x = y1
+    y = x1 - (a // b) * y1
+    return gcd, x, y
+
+def modular_inverse(e, phi):
+    gcd, x, _ = extended_gcd(e, phi)
+    if gcd != 1:
+        raise ValueError(f"No modular inverse exists for e={e} and phi={phi}.")
+    return x % phi
+
+def rsa_keygen(bits=2048):
+    # Step 1: Generate two large prime numbers, p and q
+    p = getPrime(bits // 2)
+    q = getPrime(bits // 2)
+    # Step 2: Compute n and phi(n)
+    n = p * q
+    phi = (p - 1) * (q - 1)
+    # Step 3: Choose public exponent e
+    e = 65537  # Commonly used public exponent
+    # Step 4: Compute private key d using the custom modular inverse function
+    d = modular_inverse(e, phi)
+    return (e, n), (d, n)
+
+def rsa_encrypt(public_key, plaintext):
+    e, n = public_key
+    # Convert plaintext to an integer
+    plaintext_int = bytes_to_long(plaintext.encode())
+    # Encrypt: c = m^e mod n
+    ciphertext = pow(plaintext_int, e, n)
+    return ciphertext
+
+def rsa_decrypt(private_key, ciphertext):
+    d, n = private_key
+    # Decrypt: m = c^d mod n
+    plaintext_int = pow(ciphertext, d, n)
+    # Convert integer back to plaintext
+    plaintext = long_to_bytes(plaintext_int).decode()
+    return plaintext
 
 # IETF-recommended parameters
 q = """
@@ -132,4 +175,17 @@ print(f"Mallory reads: {decrypted_message2}")
 #she knows that s is also going to be 1. If she sets alpha to q bobs, alices, and the
 #shared keys will be 0. By setting alpha to q-1 she knows that the keys will
 #either be equal to 1, or q -1. From there she can decrypt the messages
+
+print(f"\n--------------------------------------------------------------\n")
+# Generate RSA keys
+public_key, private_key = rsa_keygen(bits=2048)
+plaintext = "Hi, Bob!"
+# Encrypt the plaintext
+ciphertext = rsa_encrypt(public_key, plaintext)
+print(f"Ciphertext: {ciphertext}")
+# Decrypt the ciphertext
+decrypted_message = rsa_decrypt(private_key, ciphertext)
+print(f"Decrypted message: {decrypted_message}")
+# Verify the decryption
+assert plaintext == decrypted_message, "Decryption failed!"
 
