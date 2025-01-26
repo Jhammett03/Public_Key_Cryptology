@@ -57,6 +57,7 @@ B10B8F96A080E01DDE92DE5EAE5D54EC52C99FBCFB06A3C69A6A9DCA52D23B61
 ACCBDD7D90C4BD7098488E9C219A73724EFFD6FAE5644738FAA31A4FF55BCCC0
 A151AF5F0DC8B4BD45BF37DF365C1A65E68CFDA76D4DA708DF1FB2BC2E4A4371
 """
+
 alpha = """
 A4D1CBD5C3FD34126765A442EFB99905F8104DD258AC507FD6406CFF14266D31
 266FEA1E5C41564B777E690F5504F213160217B4B01B886A5E91547F9E2749F4
@@ -75,3 +76,60 @@ decrypted_message = aes_decrypt(shared_key, ciphertext)
 print(f"Alice's message: {message_alice_to_bob}")
 print(f"Ciphertext (sent to Bob): {ciphertext.hex()}")
 print(f"Decrypted message (at Bob): {decrypted_message}")
+
+"""PART 2"""
+print(f"\n--------------------------------------------------------------\n")
+#Mallory intercepts and replaces with 1
+qnum = int(q.replace("\n", "").replace(" ", ""), 16)
+alphanum = int(alpha.replace("\n", "").replace(" ", ""), 16)
+bob_pick = random.randint(1, qnum - 1)
+alice_pick = random.randint(1, qnum - 1)
+mallory_mod = qnum
+print(f"Bob picks : {bob_pick}")
+print(f"Alice picks : {alice_pick}")
+bob_key = pow(alphanum, bob_pick, qnum)
+alice_key = pow(alphanum, alice_pick, qnum)
+s = pow(mallory_mod, bob_pick, qnum)
+shared = SHA256.new(
+        data=s.to_bytes((s.bit_length() + 7) // 8, byteorder='big')).digest()[:16]
+print(f"Bob's key: {bob_key}")
+print(f"Alice's key: {alice_key}")
+message = "I sure hope nobody can read this Bob."
+encrypted = aes_encrypt(shared, message)
+print(f"Alice sends: {message}")
+print(f"Encrypted message: {encrypted}")
+
+#Since Mallory intercepted Ya and Yb and replaced it with q, s will always be 0 regardless of what
+#Bob and Alice's keys are since q^x % q is always 0
+malloryskey = SHA256.new(bytes(0)).digest()[:16]
+decrypted_message = aes_decrypt(malloryskey, encrypted)
+print(f"Mallory reads: {decrypted_message}")
+print(f"\n--------------------------------------------------------------\n")
+"""TAMPERING WITH ALPHA"""
+tamperedalpha = 1
+
+bob_pick = random.randint(1, qnum - 1)
+alice_pick = random.randint(1, qnum - 1)
+print(f"Bob picks : {bob_pick}")
+print(f"Alice picks : {alice_pick}")
+bob_key = pow(tamperedalpha, bob_pick, qnum)
+alice_key = pow(tamperedalpha, alice_pick, qnum)
+s = pow(bob_key, bob_pick, qnum)
+shared = SHA256.new(
+        data=s.to_bytes((s.bit_length() + 7) // 8, byteorder='big')).digest()[:16]
+print(f"Bob's key: {bob_key}")
+print(f"Alice's key: {alice_key}")
+print(f"S: {s}")
+message = "I sure hope nobody can read this Bob."
+encrypted = aes_encrypt(shared, message)
+print(f"Alice sends: {message}")
+print(f"Encrypted message: {encrypted}")
+mallory = 1
+malloryskey2 = SHA256.new(data=mallory.to_bytes((s.bit_length() + 7) // 8, byteorder='big')).digest()[:16]
+decrypted_message2 = aes_decrypt(malloryskey2, encrypted)
+print(f"Mallory reads: {decrypted_message2}")
+#By setting the alpha to 1 Mallory knows that both bob and alices keys are going to be 1 from there
+#she knows that s is also going to be 1. If she sets alpha to q bobs, alices, and the
+#shared keys will be 0. By setting alpha to q-1 she knows that the keys will
+#either be equal to 1, or q -1. From there she can decrypt the messages
+
